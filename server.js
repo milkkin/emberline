@@ -592,4 +592,10 @@ http
       send(res, e.status || 500, { error: e instanceof HttpError ? e.message : 'Server error' });
     }
   })
-  .listen(PORT, () => console.log(`Emberline running at http://localhost:${PORT}`));
+  .listen(PORT, () => {
+    console.log(`Emberline running at http://localhost:${PORT}`);
+    // With Telegram configured, connect the bot to this server on every start (webhook, Play button).
+    if (SHOP_ON && (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL)) {
+      require('child_process').spawn(process.execPath, [path.join(__dirname, 'tools', 'telegram-setup.js')], { stdio: 'inherit' }).on('error', (e) => console.error('Telegram setup could not start:', e.message));
+    }
+  });

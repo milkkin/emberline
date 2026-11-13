@@ -5,9 +5,10 @@
 //   TELEGRAM_BOT_TOKEN       the token BotFather gave you (keep it secret)
 //   TELEGRAM_WEBHOOK_SECRET  any long random string; the server must be started with the same one
 //   PUBLIC_URL               the https address of your server, e.g. https://emberline.example.com
+//                            (on Render this is filled in automatically)
 //
 //   node tools/telegram-setup.js
-const token = process.env.TELEGRAM_BOT_TOKEN, secret = process.env.TELEGRAM_WEBHOOK_SECRET, url = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+const token = process.env.TELEGRAM_BOT_TOKEN, secret = process.env.TELEGRAM_WEBHOOK_SECRET, url = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '');
 if (!token || !secret || !/^https:\/\//.test(url)) {
   console.error('Set TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET and PUBLIC_URL (must start with https://) first.');
   process.exit(1);

@@ -1,6 +1,7 @@
 # Render blueprint: one free web service running the Emberline server.
-# After the first deploy, add TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET and PUBLIC_URL
-# under the service's Environment tab (never commit them to the repository).
+# After the first deploy, add TELEGRAM_BOT_TOKEN and TELEGRAM_WEBHOOK_SECRET under the
+# service's Environment tab (never commit them to the repository). The server then connects
+# the bot to itself on every start.
 services:
   - type: web
     name: emberline
@@ -15,6 +16,4 @@ services:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_WEBHOOK_SECRET
-        sync: false
-      - key: PUBLIC_URL
         sync: false
