@@ -253,3 +253,28 @@ td.g { text-transform: capitalize; font-weight: 600; }
 .buy-row b { font-size: 14px; }
 /* solo (no-server) mode */
 .solo #logout-btn, .solo #user-name { display: none !important; }
+
+/* airdrop */
+.sparks-chip { border: 1px solid #f2c14e; background: linear-gradient(135deg, #3a2608, #6b4410); color: #fff3c8; border-radius: 20px; padding: 6px 14px; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 0 14px rgba(242,193,78,.4); white-space: nowrap; }
+.sparks-chip::before { content: '✦ '; color: #ffd24a; }
+.airdrop { display: flex; align-items: center; gap: 22px; padding: 26px 30px; margin-bottom: 18px; border-radius: 18px; border: 2px solid #f2c14e; background: radial-gradient(120% 180% at 0% 0%, #7a4a0c 0%, #3a1f08 45%, #1d1226 100%); box-shadow: 0 0 34px rgba(242,193,78,.35), inset 0 0 40px rgba(255,180,60,.12); }
+.airdrop-star { width: 86px; height: 86px; flex: none; color: #ffd24a; filter: drop-shadow(0 0 14px rgba(255,200,60,.9)); animation: sparkspin 5s ease-in-out infinite; }
+.airdrop-star svg { width: 100%; height: 100%; }
+@keyframes sparkspin { 0%, 100% { transform: scale(1) rotate(0); } 50% { transform: scale(1.12) rotate(12deg); } }
+.airdrop-main { flex: 1; min-width: 0; }
+.airdrop-kicker { color: #ffd24a; font-weight: 900; letter-spacing: .22em; font-size: 13px; }
+.airdrop-title { font-size: clamp(28px, 5vw, 46px); font-weight: 900; line-height: 1.1; color: #fff6d6; text-shadow: 0 0 22px rgba(255,190,60,.6); }
+.airdrop-sub { color: #f0dcb0; margin: 6px 0 12px; font-size: 15px; }
+.airdrop-bar { height: 12px; border-radius: 8px; background: rgba(0,0,0,.45); overflow: hidden; border: 1px solid rgba(242,193,78,.4); }
+.airdrop-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ff9a1f, #ffe27a); box-shadow: 0 0 12px #ffc23c; transition: width .4s; }
+.airdrop-meta { color: #d8c08a; font-size: 12px; margin-top: 6px; }
+.airdrop-btn { flex: none; background: linear-gradient(135deg, #ffe27a, #ff9a1f); color: #2a1404; font-size: 17px; padding: 16px 26px; text-decoration: none; box-shadow: 0 4px 0 #a8620e; }
+.spark-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin-top: 14px; }
+.spark-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.spark-card h3 { margin: 0 0 6px; font-size: 16px; }
+.spark-card p { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.spark-card .airdrop-bar { margin-bottom: 12px; }
+@media (max-width: 860px) {
+  .airdrop { flex-direction: column; text-align: center; padding: 20px; gap: 12px; }
+  .airdrop-btn { width: 100%; }
+}

@@ -15,6 +15,7 @@ function h(tag, props = {}, ...kids) {
 const svg = (d, vb = '0 0 24 24') => `<svg viewBox="${vb}" fill="currentColor" aria-hidden="true">${d}</svg>`;
 const ICON = {
   home: svg('<path d="M12 3l9 8h-2.5v9h-5v-6h-3v6h-5v-9H3z"/>'),
+  spark: svg('<path d="M12 1l2.6 7.4L22 11l-7.4 2.6L12 21l-2.6-7.4L2 11l7.4-2.6z"/><path d="M19 16l.9 2.1L22 19l-2.1.9L19 22l-.9-2.1L16 19l2.1-.9z"/>'),
   dice: svg('<path d="M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm3 3.5A1.5 1.5 0 108 9.5 1.5 1.5 0 008 6.5zm8 0a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm-4 4a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm-4 4a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm8 0a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" fill-rule="evenodd"/>'),
   limbo: svg('<path d="M12 2l4 7h-3v6h-2V9H8zM4 18h16v3H4z"/>'),
   crash: svg('<path d="M3 20h18v2H3zM4 17l5-6 4 3 6-9 1.7 1.1L13.6 17 9.4 13.8 5.5 18.3z"/>'),
@@ -128,6 +129,55 @@ function authModal() {
   const close = modal('Welcome to Emberline', form);
   name.focus();
 }
+// ---------- Sparks (airdrop points) ----------
+const sparkNum = (x) => Math.floor(x).toLocaleString('en-US');
+const SPARKS_NOTE = 'Sparks are loyalty points earned by wagering EMBER, checking in and inviting friends. The wagering goals are capped each day at an amount free faucet credits can reach, so buying EMBER earns no extra Sparks. Sparks have no cash value and cannot be bought, sold or transferred. If Emberline distributes a token, Sparks will be used to work out shares; no airdrop, amount or date is promised.';
+async function refreshSparks() {
+  if (!state.me) return ($('#sparks-btn').hidden = true);
+  try { const a = await api('/api/airdrop'); state.sparks = a; $('#sparks-n').textContent = sparkNum(a.sparks); $('#sparks-btn').hidden = false; } catch {}
+}
+// the big banner on the lobby and at the top of the Sparks page
+function sparksBanner(a, withButton) {
+  const top = a ? a.quests[a.quests.length - 1] : null, pct = top ? Math.min(100, (top.progress / top.goal) * 100) : 0;
+  return h('div', { class: 'airdrop' },
+    h('div', { class: 'airdrop-star', html: ICON.spark }),
+    h('div', { class: 'airdrop-main' },
+      h('div', { class: 'airdrop-kicker' }, 'EMBER AIRDROP'),
+      h('div', { class: 'airdrop-title' }, a ? `${sparkNum(a.sparks)} Sparks` : 'Earn Sparks for the airdrop'),
+      h('div', { class: 'airdrop-sub' }, 'Play to earn Sparks. Your Sparks set your share if Emberline airdrops a token.'),
+      top && h('div', { class: 'airdrop-bar' }, h('i', { style: `width:${pct}%` })),
+      top && h('div', { class: 'airdrop-meta' }, `Today: ${sparkNum(top.progress)} / ${sparkNum(top.goal)} EMBER wagered · up to ${sparkNum(a.quests.reduce((t, q) => t + q.reward, 0))} Sparks a day from play`)),
+    withButton && (state.me ? h('a', { class: 'btn airdrop-btn', href: '#sparks' }, 'Open airdrop') : h('button', { class: 'btn airdrop-btn', onclick: authModal }, 'Start earning')));
+}
+function sparksView(root, live) {
+  if (!state.me) { root.append(sparksBanner(null, true), h('p', { class: 'hint', style: 'margin-top:14px' }, SPARKS_NOTE)); return; }
+  const box = h('div', {}, h('div', { class: 'hint' }, 'Loading…'));
+  root.append(box);
+  const draw = () => Promise.all([api('/api/airdrop'), api('/api/leaderboard')]).then(([a, r]) => {
+    if (!live.on) return;
+    state.sparks = a; $('#sparks-n').textContent = sparkNum(a.sparks);
+    const act = (url, payload) => attempt(async () => { await api(url, payload); await draw(); });
+    box.replaceChildren(
+      sparksBanner(a, false),
+      h('div', { class: 'stats', style: 'max-width:none;margin-top:14px' },
+        h('div', { class: 'stat' }, h('small', {}, 'Your rank'), h('b', {}, r.you && r.you.rank ? `#${r.you.rank} of ${r.players}` : '—')),
+        h('div', { class: 'stat' }, h('small', {}, 'Check-in streak'), h('b', {}, `${a.streak} day${a.streak === 1 ? '' : 's'}`)),
+        h('div', { class: 'stat' }, h('small', {}, 'Friends invited'), h('b', {}, String(a.referrals)))),
+      h('div', { class: 'spark-grid' },
+        h('div', { class: 'spark-card' }, h('h3', {}, 'Daily check-in'), h('p', {}, `+${a.checkinReward} Sparks today. Grows every day for 7 days in a row.`),
+          h('button', { class: 'btn accent big', disabled: a.checkedIn, onclick: () => act('/api/airdrop/checkin', {}) }, a.checkedIn ? 'Checked in today' : `Check in · +${a.checkinReward}`)),
+        ...a.quests.map((q) => h('div', { class: 'spark-card' }, h('h3', {}, q.name), h('p', {}, `${sparkNum(q.progress)} / ${sparkNum(q.goal)} EMBER`),
+          h('div', { class: 'airdrop-bar' }, h('i', { style: `width:${Math.min(100, (q.progress / q.goal) * 100)}%` })),
+          h('button', { class: 'btn accent big', disabled: q.claimed || q.progress < q.goal, onclick: () => act('/api/airdrop/claim', { quest: q.id }) }, q.claimed ? 'Claimed today' : `Claim +${sparkNum(q.reward)} Sparks`))),
+        h('div', { class: 'spark-card' }, h('h3', {}, 'Invite friends'), h('p', {}, `+${a.perFriend} Sparks for every friend who joins through your link.`),
+          a.refCode && a.bot ? h('div', { class: 'code' }, `https://t.me/${a.bot}?startapp=${a.refCode}`) : h('p', { class: 'hint' }, 'Your invite link appears here when you play inside Telegram.'))),
+      h('h2', { class: 'lobby-h' }, 'Top Sparks'),
+      h('div', { class: 'spark-card' }, ...(r.top.length ? r.top.slice(0, 20).map((x, i) => h('div', { class: 'wallet-row' }, h('b', {}, '#' + (i + 1)), h('div', { class: 'mono' }, x.name), h('div', { class: 'mono' }, sparkNum(x.points)))) : [h('p', { class: 'hint' }, 'Nobody has Sparks yet. Be first.')])),
+      h('p', { class: 'hint', style: 'margin-top:14px' }, SPARKS_NOTE));
+  }).catch(() => { box.replaceChildren(h('p', { class: 'hint' }, 'Sparks are unavailable right now.')); });
+  draw();
+}
+
 function walletModal() {
   const body = h('div');
   const shopBox = h('div', { class: 'hint' }, 'Loading…');
@@ -143,25 +193,7 @@ function walletModal() {
         }) }, `${p.stars.toLocaleString('en-US')} Stars`))),
       h('p', { class: 'hint' }, 'EMBER is a play currency for entertainment, for adults 18+. It has no cash value and can never be withdrawn, sold, exchanged or redeemed for anything. Winning EMBER does not win money.'));
   }).catch(() => { shopBox.textContent = 'The shop is unavailable right now.'; });
-  const pointsBox = h('div', { class: 'hint' }, 'Loading…');
-  const num = (x) => Math.floor(x).toLocaleString('en-US');
-  const drawSparks = () => Promise.all([api('/api/airdrop'), api('/api/leaderboard')]).then(([a, r]) => {
-    const act = (url, payload) => attempt(async () => { await api(url, payload); await drawSparks(); });
-    pointsBox.className = '';
-    pointsBox.replaceChildren(
-      h('div', { class: 'stats', style: 'margin-top:0' },
-        h('div', { class: 'stat' }, h('small', {}, 'Your Sparks'), h('b', {}, num(a.sparks))),
-        h('div', { class: 'stat' }, h('small', {}, 'Rank'), h('b', {}, r.you && r.you.rank ? `#${r.you.rank} of ${r.players}` : '—')),
-        h('div', { class: 'stat' }, h('small', {}, 'Check-in streak'), h('b', {}, `${a.streak} day${a.streak === 1 ? '' : 's'}`))),
-      h('div', { class: 'wallet-row' }, h('div', { class: 'mono' }, 'Daily check-in', h('small', {}, `+${a.checkinReward} Sparks · grows for 7 days in a row`)),
-        h('button', { class: 'btn accent small', disabled: a.checkedIn, onclick: () => act('/api/airdrop/checkin', {}) }, a.checkedIn ? 'Done today' : 'Check in')),
-      ...a.quests.map((q) => h('div', { class: 'wallet-row' }, h('div', { class: 'mono' }, q.name, h('small', {}, `${q.progress.toLocaleString('en-US')} / ${q.goal.toLocaleString('en-US')} · +${q.reward} Sparks`)),
-        h('button', { class: 'btn small', disabled: q.claimed || q.progress < q.goal, onclick: () => act('/api/airdrop/claim', { quest: q.id }) }, q.claimed ? 'Claimed' : 'Claim'))),
-      a.refCode && a.bot ? h('div', {}, h('p', { class: 'hint', style: 'margin:12px 0 6px' }, `Invite friends: +${a.perFriend} Sparks for each one who joins (${a.referrals} so far).`), h('div', { class: 'code' }, `https://t.me/${a.bot}?startapp=${a.refCode}`)) : null,
-      h('p', { class: 'hint' }, 'Sparks are loyalty points earned by wagering EMBER, checking in and inviting friends. The wagering goals are capped each day at an amount the free faucet covers, so buying EMBER earns no extra Sparks. They have no cash value and cannot be bought, sold or transferred. If Emberline ever distributes a token, Sparks may be used to work out shares; nothing is promised.'),
-      ...r.top.slice(0, 10).map((x, i) => h('div', { class: 'wallet-row' }, h('b', {}, '#' + (i + 1)), h('div', { class: 'mono' }, x.name), h('div', { class: 'mono' }, num(x.points)))));
-  }).catch(() => { pointsBox.textContent = 'Sparks are unavailable right now.'; });
-  drawSparks();
+  const pointsBox = h('button', { class: 'btn accent big', onclick: () => { $('#modal-root').replaceChildren(); location.hash = '#sparks'; } }, 'Open the Sparks airdrop page');
   const draw = () => {
     const s = state.me.stats;
     body.replaceChildren(
@@ -175,7 +207,7 @@ function walletModal() {
           draw();
         }) }, 'Faucet'))),
       h('h4', {}, 'Get EMBER'), shopBox,
-      h('h4', {}, 'Sparks'), pointsBox,
+      h('h4', {}, 'Sparks airdrop'), pointsBox,
       h('h4', {}, 'Your stats'),
       h('div', { class: 'stats', style: 'margin-top:0' },
         h('div', { class: 'stat' }, h('small', {}, 'Bets'), h('b', {}, String(s.bets))),
@@ -327,6 +359,7 @@ function fitCanvas(canvas) {
 // ---------- views ----------
 // Each view receives a `live` object; live.on turns false when the user navigates away.
 const views = {};
+views.sparks = sparksView;
 
 views[''] = (root, live) => {
   const cards = [
@@ -337,6 +370,7 @@ views[''] = (root, live) => {
     ['plinko', 'Plinko', 'Drop the ball, chase the edges', '#6b1f47,#c73d83'],
   ];
   root.append(
+    sparksBanner(state.sparks || null, true),
     h('div', { class: 'hero' },
       h('h1', {}, 'Every roll, verifiable.'),
       h('p', {}, 'Ten slots with wild reels, tumbling wins and max wins up to 250,000×, five table games, and results you can recompute yourself from a committed seed. Play with demo credits — nothing here costs or pays real money.'),
@@ -711,7 +745,7 @@ views.plinko = (root, live) => {
 };
 
 // ---------- router, nav, feed ----------
-const NAV = [['', 'Lobby', 'home'], ['dice', 'Dice', 'dice'], ['limbo', 'Limbo', 'limbo'], ['crash', 'Crash', 'crash'], ['mines', 'Mines', 'mines'], ['plinko', 'Plinko', 'plinko']];
+const NAV = [['', 'Lobby', 'home'], ['sparks', 'Airdrop', 'spark'], ['dice', 'Dice', 'dice'], ['limbo', 'Limbo', 'limbo'], ['crash', 'Crash', 'crash'], ['mines', 'Mines', 'mines'], ['plinko', 'Plinko', 'plinko']];
 let live = { on: false };
 function route() {
   const id = location.hash.replace(/^#\/?/, '');
@@ -725,6 +759,7 @@ function route() {
   views[view](root, live);
 }
 async function refreshBets() {
+  refreshSparks();
   if (state.feed === 'mine' && !state.me) {
     return $('#bets-body').replaceChildren(h('tr', {}, h('td', { colspan: 5, class: 'empty' }, 'Log in to see your bets.')));
   }
@@ -762,6 +797,7 @@ async function init() {
   });
   $('#login-btn').addEventListener('click', authModal);
   $('#wallet-btn').addEventListener('click', walletModal);
+  $('#sparks-btn').addEventListener('click', () => { location.hash = '#sparks'; });
   $('#fair-btn').addEventListener('click', fairModal);
   $('#logout-btn').addEventListener('click', async () => {
     await api('/api/logout', {}).catch(() => {});
@@ -780,6 +816,7 @@ async function init() {
     $('.demo-bar').textContent = 'Solo demo — play credits with no cash value, saved in this browser only.';
   }
   setUser(me.user);
+  await refreshSparks();
   window.addEventListener('hashchange', route);
   route();
   refreshBets();
