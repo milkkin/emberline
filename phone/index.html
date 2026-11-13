@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emberline — Provably Fair Casino</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff6b3d'/%3E%3Cpath d='M9 22l7-13 7 13z' fill='%23120f17'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="logo" href="#lobby"><span class="logo-mark"></span>EMBERLINE</a>
+  <div class="top-mid" id="wallet-pill" hidden>
+    <select id="cur" aria-label="Currency"></select>
+    <span id="bal" class="mono">0.00</span>
+    <button id="wallet-btn" class="btn accent small">Wallet</button>
+  </div>
+  <div class="top-right">
+    <button id="fair-btn" class="btn ghost small">Fairness</button>
+    <span id="user-name" class="user-name" hidden></span>
+    <button id="logout-btn" class="btn ghost small" hidden>Log out</button>
+    <button id="login-btn" class="btn accent small">Log in / Register</button>
+  </div>
+</header>
+<div class="demo-bar">Demo mode — all balances are play credits with no cash value. No deposits, no withdrawals.</div>
+<div class="shell">
+  <nav class="side" id="nav"></nav>
+  <main>
+    <div id="view"></div>
+    <section class="bets">
+      <div class="tabs">
+        <button class="tab on" data-feed="all">All bets</button>
+        <button class="tab" data-feed="mine">My bets</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Game</th><th>Player</th><th class="r">Bet</th><th class="r">Multiplier</th><th class="r">Payout</th></tr></thead>
+          <tbody id="bets-body"></tbody>
+        </table>
+      </div>
+    </section>
+    <footer>Emberline is a demonstration project. Every result is derived from HMAC-SHA256(server seed, client seed : nonce) and can be verified in the Fairness panel. House edge 1% on the table games; slots return 96%.</footer>
+  </main>
+</div>
+<div id="modal-root"></div>
+<div id="toasts"></div>
+<script src="slots-engine.js"></script>
+<script src="slots-math.js"></script>
+<script src="local-backend.js"></script>
+<script src="app.js"></script>
+<script src="slots-art.js"></script>
+<script src="slots-art2.js"></script>
+<script src="slots-art3.js"></script>
+<script src="slots-art4.js"></script>
+<script src="slots.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "emberline",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Provably fair demo-balance crypto casino (dice, limbo, crash, mines, plinko)",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
