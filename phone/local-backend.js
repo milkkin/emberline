@@ -99,6 +99,45 @@ window.LocalBackend = (() => {
     }
   }
 
+
+  // ---------- Sparks: loyalty points ----------
+  // Earned only by free actions (daily check-in, capped daily quests, inviting friends). They
+  // never depend on buying EMBER or on how much is bet or won, so they cannot be bought.
+  const QUESTS = {
+    rounds: { name: 'Play 20 rounds of anything', goal: 20, reward: 100 },
+    variety: { name: 'Play 3 different games', goal: 3, reward: 150 },
+    faucet: { name: 'Claim the free faucet', goal: 1, reward: 50 },
+  };
+  const CHECKIN_SPARKS = 50, REFERRER_SPARKS = 500, REFERRED_SPARKS = 200;
+  const dayKey = (t = Date.now()) => new Date(t).toISOString().slice(0, 10);
+  function daily(u) {
+    if (!u.daily || u.daily.day !== dayKey()) u.daily = { day: dayKey(), rounds: 0, games: {}, faucet: 0, claimed: {}, checkin: false };
+    return u.daily;
+  }
+  const questProgress = (d, id) => (id === 'rounds' ? d.rounds : id === 'variety' ? Object.keys(d.games).length : d.faucet);
+  function sparksView(u) {
+    const d = daily(u), next = u.lastCheckin === dayKey(Date.now() - 864e5) ? (u.streak || 0) + 1 : 1;
+    return {
+      sparks: u.sparks || 0, streak: u.streak || 0, checkedIn: d.checkin, checkinReward: CHECKIN_SPARKS * Math.min(7, d.checkin ? u.streak || 1 : next),
+      quests: Object.entries(QUESTS).map(([id, q]) => ({ id, ...q, progress: Math.min(q.goal, questProgress(d, id)), claimed: !!d.claimed[id] })),
+      referrals: u.refs || 0, refCode: null, bot: '', perFriend: REFERRER_SPARKS,
+    };
+  }
+  function sparksCheckin(u) {
+    const d = daily(u);
+    if (d.checkin) bad('You have already checked in today');
+    u.streak = u.lastCheckin === dayKey(Date.now() - 864e5) ? (u.streak || 0) + 1 : 1;
+    u.lastCheckin = dayKey(); d.checkin = true;
+    u.sparks = (u.sparks || 0) + CHECKIN_SPARKS * Math.min(7, u.streak);
+  }
+  function sparksClaim(u, id) {
+    const d = daily(u), q = Object.hasOwn(QUESTS, id) ? QUESTS[id] : bad('Unknown quest');
+    if (d.claimed[id]) bad('Already claimed today');
+    if (questProgress(d, id) < q.goal) bad('Quest not finished yet');
+    d.claimed[id] = true;
+    u.sparks = (u.sparks || 0) + q.reward;
+  }
+  
   // ---------- betting core ----------
   function takeBet(u, body) {
     const cur = String(body.currency);
@@ -114,7 +153,7 @@ window.LocalBackend = (() => {
   function recordBet(u, game, bet, cur, mult, nonce) {
     const payout = r8(bet * mult), rate = CURRENCIES[cur].rate;
     u.bal[cur] = r8(u.bal[cur] + payout);
-    u.stats.bets++; u.stats.wagered = r8(u.stats.wagered + bet * rate); u.stats.profit = r8(u.stats.profit + (payout - bet) * rate); u.stats.points = Math.round(((u.stats.points || 0) + bet * rate) * 100) / 100;
+    u.stats.bets++; u.stats.wagered = r8(u.stats.wagered + bet * rate); u.stats.profit = r8(u.stats.profit + (payout - bet) * rate); const d = daily(u); d.rounds++; d.games[game] = 1;
     const rec = { id: ++db.betId, game, user: u.name, bet, cur, mult, payout, nonce, t: Date.now() };
     db.bets.push(rec);
     if (db.bets.length > 200) db.bets.splice(0, db.bets.length - 150);
@@ -168,6 +207,7 @@ window.LocalBackend = (() => {
       const wait = u.faucetAt + FAUCET_COOLDOWN - Date.now();
       if (wait > 0) bad(`Faucet available in ${Math.ceil(wait / 1000)}s`);
       u.faucetAt = Date.now();
+      daily(u).faucet = 1;
       u.bal[cur] = r8(u.bal[cur] + CURRENCIES[cur].start);
       save();
       return { bal: copy(u.bal) };
@@ -268,7 +308,10 @@ window.LocalBackend = (() => {
       return { round: { spins: r.spins, units: r.units, capped: r.capped }, bal: copy(u.bal), bet: rec };
     },
     '/api/shop': () => ({ enabled: false, packs: [] }),
-    '/api/leaderboard': (u) => ({ top: u.stats.points ? [{ name: u.name, points: u.stats.points }] : [], you: { points: u.stats.points || 0, rank: u.stats.points ? 1 : null }, players: u.stats.points ? 1 : 0 }),
+    '/api/leaderboard': (u) => ({ top: u.sparks ? [{ name: u.name, points: u.sparks }] : [], you: { points: u.sparks || 0, rank: u.sparks ? 1 : null }, players: u.sparks ? 1 : 0 }),
+    '/api/airdrop': (u) => sparksView(u),
+    '/api/airdrop/checkin': (u) => { sparksCheckin(u); save(); return sparksView(u); },
+    '/api/airdrop/claim': (u, body) => { sparksClaim(u, String(body.quest)); save(); return sparksView(u); },
     '/api/bets': () => ({ bets: db.bets.slice(-30).reverse() }),
     '/api/bets/mine': () => ({ bets: db.bets.slice(-30).reverse() }),
   };

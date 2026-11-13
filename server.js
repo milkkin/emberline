@@ -45,6 +45,7 @@ const PACKS = {
   medium: { stars: 500, ember: 30000, name: 'Chest of EMBER' },
   large: { stars: 2500, ember: 200000, name: 'Vault of EMBER' },
 };
+let BOT_NAME = ''; // filled in from Telegram at start, for invite links
 async function telegram(method, payload) {
   const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   const j = await r.json().catch(() => ({}));
@@ -219,6 +220,45 @@ function throttle(req) {
   authHits.set(ip, hits);
 }
 
+
+// ---------- Sparks: loyalty points ----------
+// Earned only by free actions (daily check-in, capped daily quests, inviting friends). They
+// never depend on buying EMBER or on how much is bet or won, so they cannot be bought.
+const QUESTS = {
+  rounds: { name: 'Play 20 rounds of anything', goal: 20, reward: 100 },
+  variety: { name: 'Play 3 different games', goal: 3, reward: 150 },
+  faucet: { name: 'Claim the free faucet', goal: 1, reward: 50 },
+};
+const CHECKIN_SPARKS = 50, REFERRER_SPARKS = 500, REFERRED_SPARKS = 200;
+const dayKey = (t = Date.now()) => new Date(t).toISOString().slice(0, 10);
+function daily(u) {
+  if (!u.daily || u.daily.day !== dayKey()) u.daily = { day: dayKey(), rounds: 0, games: {}, faucet: 0, claimed: {}, checkin: false };
+  return u.daily;
+}
+const questProgress = (d, id) => (id === 'rounds' ? d.rounds : id === 'variety' ? Object.keys(d.games).length : d.faucet);
+function sparksView(u) {
+  const d = daily(u), next = u.lastCheckin === dayKey(Date.now() - 864e5) ? (u.streak || 0) + 1 : 1;
+  return {
+    sparks: u.sparks || 0, streak: u.streak || 0, checkedIn: d.checkin, checkinReward: CHECKIN_SPARKS * Math.min(7, d.checkin ? u.streak || 1 : next),
+    quests: Object.entries(QUESTS).map(([id, q]) => ({ id, ...q, progress: Math.min(q.goal, questProgress(d, id)), claimed: !!d.claimed[id] })),
+    referrals: u.refs || 0, refCode: u.key.startsWith('tg') ? u.key : null, bot: BOT_NAME, perFriend: REFERRER_SPARKS,
+  };
+}
+function sparksCheckin(u) {
+  const d = daily(u);
+  if (d.checkin) bad('You have already checked in today');
+  u.streak = u.lastCheckin === dayKey(Date.now() - 864e5) ? (u.streak || 0) + 1 : 1;
+  u.lastCheckin = dayKey(); d.checkin = true;
+  u.sparks = (u.sparks || 0) + CHECKIN_SPARKS * Math.min(7, u.streak);
+}
+function sparksClaim(u, id) {
+  const d = daily(u), q = Object.hasOwn(QUESTS, id) ? QUESTS[id] : bad('Unknown quest');
+  if (d.claimed[id]) bad('Already claimed today');
+  if (questProgress(d, id) < q.goal) bad('Quest not finished yet');
+  d.claimed[id] = true;
+  u.sparks = (u.sparks || 0) + q.reward;
+}
+
 // ---------- betting core ----------
 function takeBet(u, body) {
   const cur = String(body.currency);
@@ -238,7 +278,7 @@ function recordBet(u, game, bet, cur, mult, nonce) {
   u.stats.bets++;
   u.stats.wagered = r8(u.stats.wagered + bet * rate);
   u.stats.profit = r8(u.stats.profit + (payout - bet) * rate);
-  u.stats.points = Math.round(((u.stats.points || 0) + bet * rate) * 100) / 100; // 1 point per $1 of demo credits wagered
+  const d = daily(u); d.rounds++; d.games[game] = 1; // quest progress counts rounds, never amounts
   const rec = { id: ++db.betId, game, user: u.name, bet, cur, mult, payout, nonce, t: Date.now() };
   db.bets.push(rec);
   if (db.bets.length > 3000) db.bets.splice(0, db.bets.length - 2000);
@@ -321,6 +361,7 @@ route('POST', '/api/faucet', (req, res, u, body) => {
   const wait = u.faucetAt + FAUCET_COOLDOWN - Date.now();
   if (wait > 0) bad(`Faucet available in ${Math.ceil(wait / 1000)}s`, 429);
   u.faucetAt = Date.now();
+  daily(u).faucet = 1;
   u.bal[cur] = r8(u.bal[cur] + CURRENCIES[cur].start);
   save();
   return { bal: u.bal };
@@ -444,13 +485,12 @@ route('POST', '/api/slots/spin', (req, res, u, body) => {
 });
 
 route('GET', '/api/leaderboard', (req, res, u) => {
-  const all = Object.values(db.users).filter((x) => x.stats.points > 0).sort((a, b) => b.stats.points - a.stats.points);
-  return {
-    top: all.slice(0, 20).map((x) => ({ name: x.name, points: x.stats.points })),
-    you: u ? { points: u.stats.points || 0, rank: all.indexOf(u) + 1 || null } : null,
-    players: all.length,
-  };
+  const all = Object.values(db.users).filter((x) => x.sparks > 0).sort((a, b) => b.sparks - a.sparks);
+  return { top: all.slice(0, 20).map((x) => ({ name: x.name, points: x.sparks })), you: u ? { points: u.sparks || 0, rank: all.indexOf(u) + 1 || null } : null, players: all.length };
 }, false);
+route('GET', '/api/airdrop', (req, res, u) => sparksView(u));
+route('POST', '/api/airdrop/checkin', (req, res, u) => { sparksCheckin(u); save(); return sparksView(u); });
+route('POST', '/api/airdrop/claim', (req, res, u, body) => { sparksClaim(u, String(body.quest)); save(); return sparksView(u); });
 
 // Telegram sends signed "initData" to a Mini App. The signature proves who the player is.
 route('POST', '/api/telegram', (req, res, _, body) => {
@@ -469,7 +509,15 @@ route('POST', '/api/telegram', (req, res, _, body) => {
   if (!tu || !Number.isSafeInteger(tu.id)) bad('Invalid Telegram login', 401);
   const key = 'tg' + tu.id;
   let u = Object.hasOwn(db.users, key) ? db.users[key] : null;
-  if (!u) u = createUser(key, newSeed());
+  if (!u) {
+    u = createUser(key, newSeed());
+    // invite links carry the inviter's code; both sides get Sparks once, when the friend first joins
+    const ref = String(p.get('start_param') || '');
+    if (/^tg\d+$/.test(ref) && ref !== key && Object.hasOwn(db.users, ref)) {
+      u.ref = ref; u.sparks = REFERRED_SPARKS;
+      db.users[ref].sparks = (db.users[ref].sparks || 0) + REFERRER_SPARKS; db.users[ref].refs = (db.users[ref].refs || 0) + 1;
+    }
+  }
   const handle = String(tu.username || '').replace(/[^A-Za-z0-9_]/g, '').slice(0, 20);
   u.name = '@' + (handle || key); // "@" keeps Telegram names apart from registered usernames
   return { user: publicUser(u), token: startSession(res, u) };
@@ -594,6 +642,7 @@ http
   })
   .listen(PORT, () => {
     console.log(`Emberline running at http://localhost:${PORT}`);
+    if (BOT_TOKEN) telegram('getMe').then((me) => { BOT_NAME = me.username; }).catch(() => {});
     // With Telegram configured, connect the bot to this server on every start (webhook, Play button).
     if (SHOP_ON && (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL)) {
       require('child_process').spawn(process.execPath, [path.join(__dirname, 'tools', 'telegram-setup.js')], { stdio: 'inherit' }).on('error', (e) => console.error('Telegram setup could not start:', e.message));

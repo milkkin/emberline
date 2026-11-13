@@ -144,15 +144,24 @@ function walletModal() {
       h('p', { class: 'hint' }, 'EMBER is a play currency for entertainment, for adults 18+. It has no cash value and can never be withdrawn, sold, exchanged or redeemed for anything. Winning EMBER does not win money.'));
   }).catch(() => { shopBox.textContent = 'The shop is unavailable right now.'; });
   const pointsBox = h('div', { class: 'hint' }, 'Loading…');
-  api('/api/leaderboard').then((r) => {
+  const num = (x) => Math.floor(x).toLocaleString('en-US');
+  const drawSparks = () => Promise.all([api('/api/airdrop'), api('/api/leaderboard')]).then(([a, r]) => {
+    const act = (url, payload) => attempt(async () => { await api(url, payload); await drawSparks(); });
     pointsBox.className = '';
     pointsBox.replaceChildren(
-      h('div', { class: 'stats', style: 'margin-top:0;grid-template-columns:repeat(2,1fr)' },
-        h('div', { class: 'stat' }, h('small', {}, 'Your points'), h('b', {}, Math.floor(r.you ? r.you.points : 0).toLocaleString('en-US'))),
-        h('div', { class: 'stat' }, h('small', {}, 'Your rank'), h('b', {}, r.you && r.you.rank ? `#${r.you.rank} of ${r.players}` : '—'))),
-      h('p', { class: 'hint' }, 'You earn 1 point for every $1 of demo credits you wager. Points have no cash value and no reward is attached to them.'),
-      ...r.top.slice(0, 10).map((x, i) => h('div', { class: 'wallet-row' }, h('b', {}, '#' + (i + 1)), h('div', { class: 'mono' }, x.name), h('div', { class: 'mono' }, Math.floor(x.points).toLocaleString('en-US')))));
-  }).catch(() => { pointsBox.textContent = 'Points are unavailable right now.'; });
+      h('div', { class: 'stats', style: 'margin-top:0' },
+        h('div', { class: 'stat' }, h('small', {}, 'Your Sparks'), h('b', {}, num(a.sparks))),
+        h('div', { class: 'stat' }, h('small', {}, 'Rank'), h('b', {}, r.you && r.you.rank ? `#${r.you.rank} of ${r.players}` : '—')),
+        h('div', { class: 'stat' }, h('small', {}, 'Check-in streak'), h('b', {}, `${a.streak} day${a.streak === 1 ? '' : 's'}`))),
+      h('div', { class: 'wallet-row' }, h('div', { class: 'mono' }, 'Daily check-in', h('small', {}, `+${a.checkinReward} Sparks · grows for 7 days in a row`)),
+        h('button', { class: 'btn accent small', disabled: a.checkedIn, onclick: () => act('/api/airdrop/checkin', {}) }, a.checkedIn ? 'Done today' : 'Check in')),
+      ...a.quests.map((q) => h('div', { class: 'wallet-row' }, h('div', { class: 'mono' }, q.name, h('small', {}, `${q.progress} / ${q.goal} · +${q.reward} Sparks`)),
+        h('button', { class: 'btn small', disabled: q.claimed || q.progress < q.goal, onclick: () => act('/api/airdrop/claim', { quest: q.id }) }, q.claimed ? 'Claimed' : 'Claim'))),
+      a.refCode && a.bot ? h('div', {}, h('p', { class: 'hint', style: 'margin:12px 0 6px' }, `Invite friends: +${a.perFriend} Sparks for each one who joins (${a.referrals} so far).`), h('div', { class: 'code' }, `https://t.me/${a.bot}?startapp=${a.refCode}`)) : null,
+      h('p', { class: 'hint' }, 'Sparks are loyalty points. You earn them only by checking in, finishing free daily quests and inviting friends — never by buying EMBER or by how much you bet or win. They have no cash value and cannot be bought, sold or transferred. If Emberline ever distributes a token, Sparks may be used to work out shares; nothing is promised.'),
+      ...r.top.slice(0, 10).map((x, i) => h('div', { class: 'wallet-row' }, h('b', {}, '#' + (i + 1)), h('div', { class: 'mono' }, x.name), h('div', { class: 'mono' }, num(x.points)))));
+  }).catch(() => { pointsBox.textContent = 'Sparks are unavailable right now.'; });
+  drawSparks();
   const draw = () => {
     const s = state.me.stats;
     body.replaceChildren(
@@ -166,7 +175,7 @@ function walletModal() {
           draw();
         }) }, 'Faucet'))),
       h('h4', {}, 'Get EMBER'), shopBox,
-      h('h4', {}, 'Points'), pointsBox,
+      h('h4', {}, 'Sparks'), pointsBox,
       h('h4', {}, 'Your stats'),
       h('div', { class: 'stats', style: 'margin-top:0' },
         h('div', { class: 'stat' }, h('small', {}, 'Bets'), h('b', {}, String(s.bets))),
