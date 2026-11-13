@@ -103,12 +103,12 @@
 
   // ---------- themes ----------
   THEMES.blade = {
-    tag: 'Walking wild reels raise a multiplier that never resets', bg: ['#030614', '#0c1f5a', '#2a6ad6'], accent: '#7af0ff', accent2: '#f2c14e', frame: ['#fff6c8', '#d99a2a'],
+    tag: 'Mystery runes all flip to one symbol · walking wilds', bg: ['#030614', '#0c1f5a', '#2a6ad6'], accent: '#7af0ff', accent2: '#f2c14e', frame: ['#fff6c8', '#d99a2a'],
     lows: ['#7af0ff', '#9db8ff', '#f2c14e', '#ff9ad0', '#eafcff'], icons: ['manavial', 'warhorn', 'crest', 'runesword'], glyph: 'blade', wild: ['#eafcff', '#2f7dff', '#0a1466'], ambient: 'mote', chScale: 1.1,
     quotes: { wild: ['By the rune!', 'Cleave!', 'Stand aside.'], win: ['Clean strike.', 'Honour and gold.', 'Well fought.'], big: ['ASCENSION!', 'THE BLADE AWAKENS!'], bonus: ['Free spins. Steel yourself.'], tease: ['Parried.', 'Next strike lands.'], idle: ['The rune hungers.', 'Draw, and spin.'] },
   };
   THEMES.oracle = {
-    tag: 'Tumbling wins and multiplier sigils', bg: ['#07021a', '#2a0a5a', '#a81fa0'], accent: '#ff9af0', accent2: '#f2c14e', frame: ['#fff6c8', '#d99a2a'],
+    tag: 'Every winning tumble charges the multiplier', bg: ['#07021a', '#2a0a5a', '#a81fa0'], accent: '#ff9af0', accent2: '#f2c14e', frame: ['#fff6c8', '#d99a2a'],
     lows: ['#ff9af0', '#b98aff', '#f2c14e', '#7af0ff', '#ffffff'], icons: ['voidgem', 'astrolabe', 'omask', 'wingcrown'], glyph: 'veil', wild: ['#ffe6fb', '#b23dff', '#2a0a6e'], ambient: 'star', chScale: 1.1,
     quotes: { wild: ['It is written.', 'Behold.', 'A sigil falls.'], win: ['As foreseen.', 'The veil parts.', 'Fate pays.'], big: ['THE STARS ALIGN!', 'DESTINY UNBOUND!'], bonus: ['Free spins. I saw this coming.'], tease: ['Not this thread.', 'Fate is coy.'], idle: ['I know how this ends.', 'Spin. I will pretend to be surprised.'] },
   };

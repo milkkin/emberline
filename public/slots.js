@@ -16,7 +16,7 @@
     cfg.fs.sticky && 'wild reels stick until the bonus ends',
     cfg.fs.walk && 'wild reels walk one reel left each spin and gain +1 multiplier per step',
     cfg.fs.ladder && 'every wild reel that lands adds +1 to a win multiplier that never resets',
-    cfg.type === 'tumble' && 'every multiplier block adds to a total multiplier that never resets',
+    cfg.type === 'tumble' && (cfg.chain ? 'every winning tumble adds to a multiplier that never resets' : 'every multiplier block adds to a total multiplier that never resets'),
   ].filter(Boolean).join('; ');
 
   // ---------- synthesised sound (no audio files) ----------
@@ -81,6 +81,7 @@
     const ways = Math.pow(R, N);
     const tumble = cfg.type === 'tumble';
     let tblocks = []; // multiplier blocks on the grid (tumbling slots)
+    let chainNow = 1; // running multiplier of chain slots
     const randSym = () => (Math.random() < 0.035 ? SC : (Math.random() * 9) | 0);
     const randCol = () => Array.from({ length: R }, () => (Math.random() * 9) | 0);
 
@@ -90,7 +91,7 @@
     const betLabel = h('b', { class: 'mono' }), betUsd = h('small');
     const spinSub = h('small');
     const spinBtn = h('button', { class: 'slot-spin', onclick: () => trigger() }, h('span', {}, 'SPIN'), spinSub);
-    const featBtn = h('button', { class: 'slot-opt', onclick: toggleFeature, 'aria-pressed': 'false' }, h('b', {}, tumble ? (id === 'oracle' ? 'SIGIL SPIN' : 'RUNE SPIN') : 'WILD SPIN'), h('small', {}, tumble ? `${cfg.cost.feature}× bet · a multiplier block every spin` : `${cfg.cost.feature}× bet · ${cfg.featureWilds}+ wild reels every spin`));
+    const featBtn = h('button', { class: 'slot-opt', onclick: toggleFeature, 'aria-pressed': 'false' }, h('b', {}, tumble ? (id === 'oracle' ? 'SIGIL SPIN' : 'RUNE SPIN') : 'WILD SPIN'), h('small', {}, tumble ? (cfg.chain ? `${cfg.cost.feature}× bet · multiplier starts at ×${cfg.featureChain}` : `${cfg.cost.feature}× bet · a multiplier block every spin`) : `${cfg.cost.feature}× bet · ${cfg.featureWilds}+ wild reels every spin`));
     const buyBtn = h('button', { class: 'slot-opt buy', onclick: buyBonus }, h('b', {}, 'BUY BONUS'), h('small', {}, `from ${cfg.cost.bonus}× bet · 4 bonus types`));
     const turboBtn = h('button', { class: 'slot-mini', onclick: () => { turbo = !turbo; store.set('slotTurbo', turbo ? '1' : null); syncUi(); } }, 'Turbo');
     const autoBtn = h('button', { class: 'slot-mini', onclick: () => { auto = !auto; syncUi(); if (auto && !busy) trigger(); } }, 'Auto');
@@ -136,7 +137,7 @@
       buyBtn.disabled = busy; featBtn.disabled = busy;
     }
     function stepBet(d) { if (busy) return; betIdx = clamp(betIdx + d, 0, BET_USD.length - 1); store.set('slotBet', String(betIdx)); Sfx.init(); Sfx.click(); syncUi(); }
-    function toggleFeature() { if (busy) return; feature = !feature; Sfx.init(); Sfx.click(); syncUi(); if (feature) say(tumble ? 'A multiplier block, every spin!' : `${cfg.featureWilds}+ wild reels, every spin!`, 2200); }
+    function toggleFeature() { if (busy) return; feature = !feature; Sfx.init(); Sfx.click(); syncUi(); if (feature) say(tumble ? (cfg.chain ? `Multiplier starts at ×${cfg.featureChain}!` : 'A multiplier block, every spin!') : `${cfg.featureWilds}+ wild reels, every spin!`, 2200); }
     function buyBonus() {
       if (busy || needLogin()) return;
       const bet = betAmount(), sc0 = tumble ? 4 : 3;
@@ -167,12 +168,12 @@
         h('div', { class: 'pay-grid' }, ...[8, 7, 6, 5, 4, 3, 2, 1, 0].map(row)),
         h('h4', {}, 'Tumbles'),
         h('p', {}, 'Winning symbols shatter and new ones fall in. This repeats until no new win forms; all wins from one spin are added together.'),
-        h('h4', {}, 'Multiplier blocks'),
-        h('p', {}, `2×2 blocks carrying ${cfg.mults.map((m) => '×' + m).join(', ')} can land on any spin. A spin's total win is multiplied by the sum of the blocks on the grid.`),
+        h('h4', {}, cfg.chain ? 'Sigil multiplier' : 'Multiplier blocks'),
+        h('p', {}, cfg.chain ? `Every winning tumble adds a sigil worth ${cfg.mults.map((m) => '+' + m).join(', ')} to the multiplier, which applies to the tumbles that follow. It starts at ×1 and resets after each spin.` : `2×2 blocks carrying ${cfg.mults.map((m) => '×' + m).join(', ')} can land on any spin. A spin's total win is multiplied by the sum of the blocks on the grid.`),
         h('h4', {}, 'Free spins'),
-        h('div', { class: 'pay-row' }, sc, h('div', {}, h('div', {}, `4, 5 or 6 scatters award ${cfg.fs.spins.join(', ')} free spins.`), h('div', {}, 'In free spins every block adds to a total multiplier that never resets and applies to every win.'))),
+        h('div', { class: 'pay-row' }, sc, h('div', {}, h('div', {}, `4, 5 or 6 scatters award ${cfg.fs.spins.join(', ')} free spins.`), h('div', {}, cfg.chain ? 'In free spins the sigil multiplier never resets: it carries from spin to spin.' : 'In free spins every block adds to a total multiplier that never resets and applies to every win.'))),
         h('h4', {}, 'Feature spins'),
-        h('p', {}, `Rune Spin costs ${cfg.cost.feature}× bet and guarantees a multiplier block on that spin (no scatters). Buy Bonus costs ${cfg.cost.bonus}× bet and starts free spins immediately. Enhanced (${cfg.cost.enhanced}×) and Super (${cfg.cost.super}×) bonuses start with one or two extra scatters: more free spins and a guaranteed minimum of ${E.LEVEL_MIN[1]}× and ${E.LEVEL_MIN[2]}× bet. Mystery (${cfg.cost.mystery}×) awards one of the three at random. Landing extra scatters on a normal spin upgrades the bonus the same way.`),
+        h('p', {}, `${cfg.chain ? 'Sigil' : 'Rune'} Spin costs ${cfg.cost.feature}× bet and ${cfg.chain ? 'starts the multiplier at ×' + cfg.featureChain : 'guarantees a multiplier block on that spin'} (no scatters). Buy Bonus costs ${cfg.cost.bonus}× bet and starts free spins immediately. Enhanced (${cfg.cost.enhanced}×) and Super (${cfg.cost.super}×) bonuses start with one or two extra scatters: more free spins and a guaranteed minimum of ${E.LEVEL_MIN[1]}× and ${E.LEVEL_MIN[2]}× bet. Mystery (${cfg.cost.mystery}×) awards one of the three at random. Landing extra scatters on a normal spin upgrades the bonus the same way.`),
         h('h4', {}, 'Odds'),
         h('div', { class: 'stats', style: 'margin-top:0' },
           h('div', { class: 'stat' }, h('small', {}, 'RTP (spin / rune / buy)'), h('b', {}, ['base', 'feature', 'bonus'].map((m) => (meta.rtp[m] * 100).toFixed(1) + '%').join(' / '))),
@@ -195,6 +196,7 @@
         h('div', { class: 'pay-grid' }, ...[8, 7, 6, 5, 4, 3, 2, 1, 0].map(row)),
         h('h4', {}, 'Wild reels'),
         h('p', {}, `A wild reel covers the whole reel and counts as every symbol. Wild reels can carry multipliers (${cfg.mults.filter((m) => m > 1).map((m) => '×' + m).join(', ')}); in one win they ${cfg.multMode === 'mul' ? 'multiply each other' : 'add together'}.`),
+        cfg.ability && h('h4', {}, cfg.abilityName), cfg.ability && h('p', {}, cfg.abilityText),
         h('h4', {}, 'Free spins'),
         h('div', { class: 'pay-row' }, sc, h('div', {}, h('div', {}, `3, 4 or 5 scatters award ${cfg.fs.spins.join(', ')} free spins.`), h('div', {}, `In free spins ${mechanic(cfg)}.`))),
         h('h4', {}, 'Feature spins'),
@@ -283,18 +285,42 @@
         an.joyT = Math.max(an.joyT, 0.4);
       }
     }
+    // what the reels show when they stop, before a signature ability rewrites cells
+    function preGrid(sp) {
+      if (!sp.ab) return sp.g;
+      const g0 = sp.g.map((col) => col.slice());
+      for (const [r, row, old] of sp.ab.cells) g0[r][row] = sp.ab.type === 'mystery' ? 10 : old;
+      return g0;
+    }
+    async function showAbility(sp) {
+      const ab = sp.ab;
+      if (!ab) return;
+      an.castT = 0.9; an.hypeT = Math.max(an.hypeT, 0.6);
+      say(pickOne(th.quotes.wild), 1500);
+      const cells = new Set(ab.cells.map(([r, row]) => r + ',' + row));
+      if (ab.type === 'clone') { for (let r = 0; r < ab.reels; r++) for (let row = 0; row < R; row++) cells.add(r + ',' + row); popup(`${ab.reels} REELS LINKED`, 2); }
+      hi = { cells, wilds: new Set(), t0: T };
+      Sfx.walk();
+      await wait(700);
+      hi = null;
+      flash(ab.type === 'scorch' ? '#ff7a1f' : th.wild[0], 0.35); shake(8); Sfx.wild(1);
+      for (const [r, row] of ab.cells) burst(cellX(r), cellY(row), 12, { v1: 300, cols: ab.type === 'scorch' ? ['#ffd24a', '#ff7a1f', '#ffffff'] : th.wild.concat('#ffffff') });
+      reels.forEach((r, i) => { if (r.mode === 'idle') r.col = sp.g[i].slice(); });
+      await wait(430);
+    }
     async function landReels(sp, list, tease) {
+      const g0 = preGrid(sp);
       let sc = 0;
       for (const i of list) {
         if (tease && sc >= (tumble ? 3 : 2) && !skipping) { reels[i].antic = 1; an.anticT = 1.3; Sfx.antic(); await wait(turbo ? 1500 : 950); }
-        stopReel(i, sp.g[i]);
-        if (sp.g[i].includes(SC)) sc++;
+        stopReel(i, g0[i]);
+        if (g0[i].includes(SC)) sc++;
         await wait(150);
       }
       await wait(330);
       for (const r of reels) r.antic = 0;
       // a skipped round can outrun the stop animation: make sure every reel shows its result
-      for (const i of list) if (reels[i].mode !== 'idle') { reels[i].mode = 'idle'; reels[i].col = sp.g[i].slice(); }
+      for (const i of list) if (reels[i].mode !== 'idle') { reels[i].mode = 'idle'; reels[i].col = g0[i].slice(); }
     }
     function clearPillars() { for (const p of pillars) if (!p.dying) p.dying = T; }
     async function walkPillars() {
@@ -352,6 +378,7 @@
       spinReels(list); Sfx.spin();
       await wait(430);
       await landReels(sp, list, false);
+      await showAbility(sp);
       await showWilds(sp, fresh);
       if (fs) fs.G = sp.G;
       await showWins(sp, bet);
@@ -369,12 +396,13 @@
         if (fs) { fs.G += m; fs.bump = T; Sfx.mult(fs.G); }
       }
       let k = 0;
+      if (cfg.chain) chainNow = sp.steps.length ? sp.steps[0].m : sp.chain;
       for (const st of sp.steps) {
         const syms = new Set(st.wins.map((w) => w[0])), cells = new Set();
         reels.forEach((r, i) => r.col.forEach((v, row) => { if (syms.has(v)) cells.add(i + ',' + row); }));
         hi = { cells, wilds: new Set(), t0: T };
         Sfx.win(Math.min(3, k)); an.joyT = Math.max(an.joyT, 0.7);
-        popup('+' + money((st.wins.reduce((a, w) => a + w[2], 0) / 100) * bet), Math.min(2, k));
+        popup('+' + money((st.wins.reduce((a, w) => a + w[2], 0) / 100) * bet * (st.m || 1)) + (st.m > 1 ? `  (×${st.m})` : ''), Math.min(2, k));
         await wait(540);
         hi = null;
         for (const key of cells) { const [i, row] = key.split(',').map(Number); burst(cellX(i), cellY(row), 10, { v1: 280, cols: [th.accent, '#ffffff', th.lows[0]] }); }
@@ -386,6 +414,7 @@
           free.forEach((row, j) => { drop[row] = j < fresh ? -(fresh + 0.6) : keep[j - fresh] - row; });
           r.col = st.g[i].slice(); r.drop = drop;
         });
+        if (cfg.chain) { chainNow = sp.steps[k + 1] ? sp.steps[k + 1].m : sp.chain; an.castT = 0.5; Sfx.mult(chainNow); if (fs) { fs.G = chainNow; fs.bump = T; } }
         await wait(420);
         k++;
       }
@@ -437,6 +466,7 @@
       if (tumble) return presentTumble(res, bet, cost);
       const spins = res.round.spins, first = spins[0], bonus = spins.length > 1;
       await landReels(first, all, true);
+      await showAbility(first);
       await showWilds(first, all.filter((i) => first.w[i]));
       await showWins(first, bet);
       if (bonus) {
@@ -491,7 +521,7 @@
       busy = true; skipping = false;
       Sfx.init(); Sfx.click(); Sfx.spin();
       adjustBal(-stake);
-      winShown = winTarget = 0; hi = null; clearPillars(); tblocks = [];
+      winShown = winTarget = 0; hi = null; clearPillars(); tblocks = []; chainNow = 1;
       spinReels(all); syncUi();
       const t0 = performance.now();
       const res = await attempt(() => api('/api/slots/spin', { slot: id, mode, bet, currency: state.cur }));
@@ -596,7 +626,7 @@
     }
     function drawCell(c, sym, x, y, scale, alpha) {
       const L = lay, s = L.cell * scale, o = (L.cell - s) / 2;
-      if (sym < 0 || sym > 9 || y > L.ry + L.rh || y + L.cell < L.ry) return;
+      if (sym < 0 || sym > 10 || (sym === 10 && tumble) || y > L.ry + L.rh || y + L.cell < L.ry) return;
       c.globalAlpha = alpha; c.drawImage(A.sprite(id, sym, L.px), x + o, y + o, s, s); c.globalAlpha = 1;
     }
     function drawReels(c) {
@@ -700,7 +730,7 @@
       const L = lay, u = L.unit, mid = L.rx + L.rw / 2, topY = L.ry - L.cell * 0.08 - u * 0.022, botY = L.ry + L.rh + (L.h - L.ry - L.rh) * 0.52;
       const gold = A.lin(c, 0, botY - u * 0.02, 0, botY + u * 0.02, '#fffbe0', '#ffd24a', '#ff9a1f');
       // title
-      const tx = L.mobile ? L.w * 0.64 : L.chX, ty = L.mobile ? L.h * 0.085 : L.h * 0.075, ts = Math.min(L.mobile ? u * 0.032 : u * 0.027, (L.mobile ? L.w * 0.62 : L.rx - L.cell * 0.3) / (cfg.name.length * 0.6));
+      const tx = L.mobile ? L.w * 0.64 : L.chX, ty = L.mobile ? L.h * 0.085 : L.h * 0.075, ts = Math.min(L.mobile ? u * 0.032 : u * 0.027, (L.mobile ? L.w * 0.62 : Math.min(L.rx - L.cell * 0.3, tx * 2 - 10)) / (cfg.name.length * 0.6));
       label(c, cfg.name.toUpperCase(), tx, ty, ts, { fill: A.lin(c, 0, ty - ts / 2, 0, ty + ts / 2, '#ffffff', th.accent), glow: th.accent2 });
       label(c, `MAX WIN ${cfg.cap.toLocaleString('en-US')}×`, tx, ty + ts * 1.05, ts * 0.5, { fill: th.frame[0], sw: 0.3 });
       // line above the reels
@@ -708,7 +738,7 @@
         label(c, `FREE SPIN ${fs.i} / ${fs.n}`, L.rx + L.rw, topY, u * 0.019, { align: 'right', fill: th.accent });
         if (cfg.fs.ladder || tumble) { const b = 1 + clamp(1 - (T - fs.bump) / 0.35) * 0.6; label(c, `MULTIPLIER ×${Math.max(1, fs.G)}`, L.rx, topY, u * 0.021 * b, { align: 'left', fill: gold, glow: th.accent2 }); }
       } else {
-        label(c, tumble ? 'PAYS ANYWHERE · 8+ MATCHING' : `${ways.toLocaleString('en-US')} WAYS`, L.rx, topY, u * 0.015, { align: 'left', fill: 'rgba(255,255,255,0.8)', sw: 0.3 });
+        label(c, tumble ? (cfg.chain && chainNow > 1 ? `MULTIPLIER ×${chainNow}` : 'PAYS ANYWHERE · 8+ MATCHING') : `${ways.toLocaleString('en-US')} WAYS`, L.rx, topY, u * 0.015, { align: 'left', fill: 'rgba(255,255,255,0.8)', sw: 0.3 });
         if (feature) label(c, tumble ? 'RUNE SPIN ON' : `WILD SPIN ON · ${cfg.featureWilds}+ WILD REELS`, L.rx + L.rw, topY, u * 0.015, { align: 'right', fill: th.accent, sw: 0.3 });
       }
       // line below the reels

@@ -121,12 +121,12 @@
 
   // ---------- themes ----------
   THEMES.dragon = {
-    tag: 'Wild reels walk left and multiply each other', bg: ['#0a0406', '#3a0a10', '#b5300f'], accent: '#ffb347', accent2: '#ff3d1f', frame: ['#ffe0a8', '#ff5a1f'],
+    tag: 'Scorch turns low symbols into premiums · walking wild reels', bg: ['#0a0406', '#3a0a10', '#b5300f'], accent: '#ffb347', accent2: '#ff3d1f', frame: ['#ffe0a8', '#ff5a1f'],
     lows: ['#ffb36b', '#ff7a5c', '#ffd36b', '#ff5a6a', '#fff0b8'], icons: ['scale', 'horn', 'egg', 'eye'], glyph: 'claw', wild: ['#ffe9a0', '#ff4d1f', '#5a0a12'], ambient: 'ember', chScale: 1.05,
     quotes: { wild: ['BURN!', 'My reel now.', 'Ashes!'], win: ['More for the hoard.', 'Shiny.', 'Mine!'], big: ['THE HOARD GROWS!', 'KNEEL BEFORE THE FLAME!'], bonus: ['Free spins. I am pleased.'], tease: ['Hrrrm.', 'Patience, mortal.'], idle: ['I have slept on bigger wins.', 'Wake me when it lands.'] },
   };
   THEMES.witch = {
-    tag: 'Sticky wild reels raise a multiplier that never resets', bg: ['#050312', '#1a0f4a', '#3d2a8a'], accent: '#5cffd9', accent2: '#b98aff', frame: ['#d6fff4', '#8a5cff'],
+    tag: 'Hex links reels so they land identical · sticky wilds', bg: ['#050312', '#1a0f4a', '#3d2a8a'], accent: '#5cffd9', accent2: '#b98aff', frame: ['#d6fff4', '#8a5cff'],
     lows: ['#5cffd9', '#b98aff', '#ff9ad9', '#9db8ff', '#fff2a8'], icons: ['mushroom', 'potion', 'tome', 'orb'], glyph: 'moon', wild: ['#d6fff4', '#7a4dff', '#1c0a5a'], ambient: 'mote', chScale: 1.08,
     quotes: { wild: ['Hex!', 'By the moon!', 'Abraca-wild!'], win: ['Charmed!', 'Brewed to perfection.', 'Ooh, sparkly!'], big: ['FULL MOON JACKPOT!', 'THE COVEN FEASTS!'], bonus: ['Free spins! Light the candles.'], tease: ['Curses!', 'The moon was shy.'], idle: ['Double, double, spin and bubble.', 'My bat says spin.'] },
   };

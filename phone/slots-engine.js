@@ -54,21 +54,23 @@
       fs: { spins: [10, 12, 15], sticky: true, walk: false, ladder: 1 }, cost: { base: 1, feature: 25, bonus: 100, enhanced: 250, super: 600, mystery: 200 }, featureWilds: 2,
     },
     witch: {
-      name: 'Moonhex Coven', cap: 75000, reels: 5, rows: 4, pays: PAY_5x4, mults: [1, 2, 3, 5, 10], multMode: 'add',
+      name: 'Moonhex Coven', ability: 'clone', abilityName: 'Hex link', abilityText: 'Nyx can link reels: starting from the first reel, 2 to 5 neighbouring reels land showing identical symbols.', cap: 75000, reels: 5, rows: 4, pays: PAY_5x4, mults: [1, 2, 3, 5, 10], multMode: 'add',
       fs: { spins: [10, 12, 15], sticky: true, walk: false, ladder: 1 }, cost: { base: 1, feature: 15, bonus: 100, enhanced: 250, super: 600, mystery: 200 }, featureWilds: 2,
     },
     dragon: {
-      name: 'Cinderwing', cap: 250000, reels: 6, rows: 5, pays: PAY_6x5, mults: [1, 2, 3, 5], multMode: 'mul',
+      name: 'Cinderwing', ability: 'scorch', abilityName: 'Scorch', abilityText: 'Cinderwing can burn up to three of the low symbols. Every burnt symbol turns into the same premium symbol.', cap: 250000, reels: 6, rows: 5, pays: PAY_6x5, mults: [1, 2, 3, 5], multMode: 'mul',
       fs: { spins: [8, 10, 12], sticky: false, walk: true, ladder: 0 }, cost: { base: 1, feature: 25, bonus: 100, enhanced: 250, super: 600, mystery: 200 }, featureWilds: 2,
     },
     blade: {
-      name: 'Runeblade Ascendant', cap: 120000, reels: 6, rows: 4, pays: PAY_6x4, mults: [1, 2, 3, 5], multMode: 'add',
+      name: 'Runeblade Ascendant', ability: 'mystery', abilityName: 'Mystery runes', abilityText: 'Stacks of mystery runes can land on any reel. When the reels stop they all flip to the same symbol.', cap: 120000, reels: 6, rows: 4, pays: PAY_6x4, mults: [1, 2, 3, 5], multMode: 'add',
       fs: { spins: [8, 10, 12], sticky: false, walk: true, ladder: 1 }, cost: { base: 1, feature: 15, bonus: 100, enhanced: 250, super: 600, mystery: 200 }, featureWilds: 2,
     },
     oracle: {
-      name: 'Veil Oracle', type: 'tumble', cap: 100000, reels: 6, rows: 5, pays: PAY_ANY, mults: [2, 3, 5, 10, 25, 50, 100, 250, 1000], multSkew: 15,
-      fs: { spins: [10, 12, 15] }, cost: { base: 1, feature: 20, bonus: 100, enhanced: 250, super: 600, mystery: 200 }, featureBlocks: 1,
+      name: 'Veil Oracle', type: 'tumble', cap: 100000, reels: 6, rows: 5, pays: PAY_ANY, mults: [1, 2, 3, 5, 10, 25, 50, 100], multSkew: 15, chain: true, featureChain: 10,
+      fs: { spins: [10, 12, 15] }, cost: { base: 1, feature: 20, bonus: 100, enhanced: 250, super: 600, mystery: 200 },
     },
+    // chain: true (tumbling slots): no blocks. Every winning tumble adds a sigil value to a
+    // multiplier that applies to the following tumbles; in free spins it never resets.
     // type 'tumble': winning symbols are removed and new ones fall in; 2x2 blocks carry multipliers.
     // Base game: a spin's win is multiplied by the sum of the blocks on screen. Free spins: every
     // block adds to a total multiplier that never resets.
@@ -114,7 +116,7 @@
   function getScratch(cfg) {
     let s = scratchCache.get(cfg);
     if (!s) {
-      s = { cnt: new Int32Array(cfg.reels * 10), wild: new Int32Array(cfg.reels), fw: new Int32Array(cfg.reels), scRow: new Int8Array(cfg.reels), grid: new Int8Array(cfg.reels * cfg.rows), tc: new Int32Array(9), T: 0, nsc: 0, lvl: -1 };
+      s = { cnt: new Int32Array(cfg.reels * 10), wild: new Int32Array(cfg.reels), fw: new Int32Array(cfg.reels), scRow: new Int8Array(cfg.reels), grid: new Int8Array(cfg.reels * cfg.rows), tc: new Int32Array(9), T: 0, nsc: 0, lvl: -1, cell: new Int8Array(cfg.reels * cfg.rows) };
       scratchCache.set(cfg, s);
     }
     return s;
@@ -165,10 +167,55 @@
         if (row > 0 && rng() < rho) s = prev; // stacked symbol
         else { const u = rng(); s = 0; while (u >= cum[s]) s++; }
         prev = s;
-        if (row === scRow) { if (col) col[row] = SC; }
-        else { cnt[base + s]++; if (col) col[row] = s; }
+        if (row === scRow) { st.cell[r * rows + row] = SC; if (col) col[row] = SC; }
+        else { st.cell[r * rows + row] = s; cnt[base + s]++; if (col) col[row] = s; }
       }
     }
+  }
+
+  // Signature abilities of ways slots. They rewrite cells after the reels land and before the
+  // win is counted. Returns what changed (for the animation) or null.
+  //   mystery: stacks of mystery cells that all become one symbol
+  //   scorch:  up to three low symbols all become one premium symbol
+  //   clone:   reels 2..k copy the first reel
+  function ability(cfg, rng, h, st, wild, grid) {
+    const kind = cfg.ability, n = cfg.reels, R = cfg.rows, cell = st.cell, cnt = st.cnt;
+    const set = (r, row, s) => { const i = r * R + row, o = cell[i]; cnt[r * 10 + o]--; cnt[r * 10 + s]++; cell[i] = s; if (grid) grid[r][row] = s; };
+    if (kind === 'mystery') {
+      const pm = 0.07 + 0.45 * h, cells = [];
+      for (let r = 0; r < n; r++) {
+        if (wild[r] || rng() >= pm) continue;
+        const len = 1 + ((rng() * R) | 0), start = (rng() * (R - len + 1)) | 0;
+        for (let row = start; row < start + len; row++) if (cell[r * R + row] !== SC) cells.push([r, row, cell[r * R + row]]);
+      }
+      if (!cells.length) return null;
+      const cum = symCum(h), u = rng();
+      let s = 0;
+      while (u >= cum[s]) s++;
+      for (const c of cells) set(c[0], c[1], s);
+      return { type: 'mystery', cells, sym: s };
+    }
+    if (kind === 'scorch') {
+      if (rng() >= 0.2 + 0.6 * h * h) return null;
+      const to = 5 + Math.min(3, (Math.pow(rng(), 1 - 0.7 * h) * 4) | 0);
+      const k = 1 + (rng() < 0.3 + 0.6 * h ? 1 : 0) + (rng() < h ? 1 : 0), first = (rng() * 5) | 0, cells = [];
+      for (let r = 0; r < n; r++) {
+        if (wild[r]) continue;
+        for (let row = 0; row < R; row++) { const o = cell[r * R + row]; if (o < 5 && (o - first + 5) % 5 < k) { cells.push([r, row, o]); set(r, row, to); } }
+      }
+      return cells.length ? { type: 'scorch', cells, sym: to } : null;
+    }
+    if (kind === 'clone') {
+      if (rng() >= 0.2 + 0.6 * h * h) return null;
+      const k = Math.min(n, 2 + ((Math.pow(rng(), 1 - 0.7 * h) * (n - 1)) | 0)), cells = [];
+      if (wild[0]) return null;
+      for (let r = 1; r < k; r++) {
+        if (wild[r]) continue;
+        for (let row = 0; row < R; row++) { const s = cell[row], o = cell[r * R + row]; if (s === SC || o === SC || o === s) continue; cells.push([r, row, o]); set(r, row, s); }
+      }
+      return { type: 'clone', cells, reels: k };
+    }
+    return null;
   }
 
   // Ways pays, left to right. A wild reel counts as every row matching.
@@ -216,7 +263,7 @@
     const blocks = out ? [] : null;
     let sum = 0, nb = 0;
     const wp = kind === 2 ? 0 : kind === 3 ? 0.05 + 0.8 * h * h : 0.02 + 0.75 * h * h;
-    if (wp) for (let k = 0; k < 2; k++) if (rng() < wp) nb++;
+    if (wp && !cfg.chain) for (let k = 0; k < 2; k++) if (rng() < wp) nb++;
     if (kind === 1 && nb < cfg.featureBlocks) nb = cfg.featureBlocks;
     for (let b = 0; b < nb; b++) {
       for (let t = 0; t < 8; t++) {
@@ -247,17 +294,20 @@
     }
     const snap = () => { const o = []; for (let col = 0; col < n; col++) o.push(Array.from(g.subarray(col * R, col * R + R))); return o; };
     const first = out ? snap() : null, steps = out ? [] : null;
-    let base = 0;
+    let base = 0, chainWin = 0, chain = cfg.chain ? (kind === 3 ? st.T || 1 : kind === 1 ? cfg.featureChain : 1) : 0;
     for (let iter = 0; iter < 40; iter++) {
       cnt.fill(0);
       for (let i = 0; i < cells; i++) if (g[i] < 9) cnt[g[i]]++;
       const wins = out ? [] : null;
-      let any = false;
+      let any = false, stepPay = 0;
       for (let s = 0; s < 9; s++) {
         const c = cnt[s];
-        if (c >= 8) { const pay = cfg.pays[s][c >= 12 ? 2 : c >= 10 ? 1 : 0]; base += pay; any = true; if (wins) wins.push([s, c, pay]); }
+        if (c >= 8) { const pay = cfg.pays[s][c >= 12 ? 2 : c >= 10 ? 1 : 0]; stepPay += pay; any = true; if (wins) wins.push([s, c, pay]); }
       }
       if (!any) break;
+      base += stepPay;
+      const mNow = chain;
+      if (cfg.chain) { chainWin += stepPay * chain; chain += pickMult(cfg, rng, h); } // each winning tumble charges the multiplier
       for (let col = 0; col < n; col++) {
         const o = col * R;
         let w = R - 1; // survivors sink to the lowest free cells; blocks stay where they are
@@ -269,13 +319,14 @@
         let prev = -1; // the free cells left above are refilled from the top
         for (let row = 0; row <= w; row++) { if (g[o + row] === BLOCK) { prev = -1; continue; } g[o + row] = prev = fill(prev); }
       }
-      if (steps) steps.push({ wins, g: snap() });
+      if (steps) steps.push({ wins, g: snap(), m: mNow || 1 });
     }
     let M;
-    if (kind === 3) { st.T += sum; M = st.T || 1; } else M = sum || 1;
-    const win = base * M;
+    let win;
+    if (cfg.chain) { if (kind === 3) st.T = chain; M = 1; win = chainWin; }
+    else { if (kind === 3) { st.T += sum; M = st.T || 1; } else M = sum || 1; win = base * M; }
     st.nsc = nsc;
-    if (out) out.push({ g: first, blocks, steps, base, M, T: kind === 3 ? st.T : 0, win });
+    if (out) out.push({ g: first, blocks, steps, base, M, T: kind === 3 ? st.T : 0, win, chain });
     return win;
   }
   function tumbleBonus(cfg, rng, h, st, stopAbove, out) {
@@ -319,9 +370,10 @@
     }
     const grid = out ? [] : null, wins = out ? [] : null;
     genReels(cfg, rng, h, st, grid);
+    const ab = cfg.ability && kind !== 2 ? ability(cfg, rng, h, st, st.wild, grid) : null;
     const win = evaluate(cfg, st.cnt, st.wild, 1, wins);
     st.nsc = nsc;
-    if (out) out.push({ g: grid, w: Array.from(st.wild), fresh: null, win, wins, G: 1 });
+    if (out) out.push({ g: grid, w: Array.from(st.wild), fresh: null, win, wins, G: 1, ab });
     return win;
   }
 
@@ -350,9 +402,10 @@
       G += landed * fs.ladder;
       const grid = out ? [] : null, wins = out ? [] : null;
       genReels(cfg, rng, h, st, grid);
+      const ab = cfg.ability ? ability(cfg, rng, h, st, fw, grid) : null;
       const win = evaluate(cfg, st.cnt, fw, G, wins);
       total += win;
-      if (out) out.push({ g: grid, w: Array.from(fw), fresh, win, wins, G });
+      if (out) out.push({ g: grid, w: Array.from(fw), fresh, win, wins, G, ab });
       if (total >= capU) return capU;
       if (total > stopAbove) return total;
     }

@@ -337,7 +337,15 @@ const SlotArt = (() => {
     cv.width = cv.height = px;
     const c = cv.getContext('2d'), m = px / 2;
     c.translate(m, m);
-    if (sym < 5) {
+    if (sym === 10) {
+      // mystery rune: flips to a real symbol once the reels stop
+      c.shadowColor = th.wild[1]; c.shadowBlur = px * 0.12;
+      c.fillStyle = lin(c, -m, -m, m, m, th.wild[1], th.wild[2]); rr(c, -m * 0.8, -m * 0.8, m * 1.6, m * 1.6, m * 0.3); c.fill(); c.shadowBlur = 0;
+      c.lineWidth = m * 0.07; c.strokeStyle = th.wild[0]; c.stroke();
+      c.save(); c.globalAlpha = 0.3; c.scale(m * 0.6, m * 0.6); GLYPH[th.glyph](c); c.restore();
+      c.font = `900 ${m * 1.25}px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
+      c.lineWidth = m * 0.2; c.strokeStyle = 'rgba(8,4,16,0.85)'; c.strokeText('?', 0, m * 0.06); c.fillStyle = '#ffffff'; c.fillText('?', 0, m * 0.06);
+    } else if (sym < 5) {
       const col = th.lows[sym];
       c.fillStyle = 'rgba(10,6,20,0.5)'; rr(c, -m * 0.74, -m * 0.74, m * 1.48, m * 1.48, m * 0.3); c.fill();
       c.strokeStyle = col; c.globalAlpha = 0.5; c.lineWidth = m * 0.05; c.stroke(); c.globalAlpha = 1;
