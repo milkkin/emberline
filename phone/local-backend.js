@@ -102,12 +102,12 @@ window.LocalBackend = (() => {
 
   // ---------- Sparks: loyalty points ----------
 // Earned by wagering (daily goals), a daily check-in and inviting friends. The wagering goals
-  // are capped per day at a level the free faucet covers in minutes, so buying EMBER gives no
+  // stop at 100,000 EMBER a day. Wins are re-bet, so free faucet credits can reach that; buying EMBER gives no
   // advantage: a free player can earn every Spark a paying player can.
   const QUESTS = {
-    w1: { name: 'Wager 500 EMBER today', goal: 500, reward: 50 },
-    w2: { name: 'Wager 2,000 EMBER today', goal: 2000, reward: 150 },
-    w3: { name: 'Wager 5,000 EMBER today', goal: 5000, reward: 300 },
+    w1: { name: 'Wager 5,000 EMBER today', goal: 5000, reward: 300 },
+    w2: { name: 'Wager 25,000 EMBER today', goal: 25000, reward: 1000 },
+    w3: { name: 'Wager 100,000 EMBER today', goal: 100000, reward: 3000 },
   };
   const CHECKIN_SPARKS = 50, REFERRER_SPARKS = 500, REFERRED_SPARKS = 200;
   const dayKey = (t = Date.now()) => new Date(t).toISOString().slice(0, 10);
