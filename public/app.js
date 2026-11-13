@@ -170,7 +170,17 @@ function sparksView(root, live) {
           h('div', { class: 'airdrop-bar' }, h('i', { style: `width:${Math.min(100, (q.progress / q.goal) * 100)}%` })),
           h('button', { class: 'btn accent big', disabled: q.claimed || q.progress < q.goal, onclick: () => act('/api/airdrop/claim', { quest: q.id }) }, q.claimed ? 'Claimed today' : `Claim +${sparkNum(q.reward)} Sparks`))),
         h('div', { class: 'spark-card' }, h('h3', {}, 'Invite friends'), h('p', {}, `+${a.perFriend} Sparks for every friend who joins through your link.`),
-          a.refCode && a.bot ? h('div', { class: 'code' }, `https://t.me/${a.bot}?startapp=${a.refCode}`) : h('p', { class: 'hint' }, 'Your invite link appears here when you play inside Telegram.'))),
+          a.refCode && a.bot ? h('div', { class: 'row' }, h('div', { class: 'code', style: 'flex:1;min-width:0' }, `https://t.me/${a.bot}?startapp=${a.refCode}`),
+            h('button', { class: 'btn accent small', onclick: async (e) => {
+              const link = `https://t.me/${a.bot}?startapp=${a.refCode}`, btn = e.currentTarget;
+              try { await navigator.clipboard.writeText(link); btn.textContent = 'Copied'; toast('Invite link copied', true); }
+              catch { // clipboard blocked: select the link so it can be copied by hand
+                const range = document.createRange(); range.selectNodeContents(btn.previousSibling);
+                const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+                toast('Link selected — press and hold to copy');
+              }
+              setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+            } }, 'Copy')) : h('p', { class: 'hint' }, 'Your invite link appears here when you play inside Telegram.'))),
       h('h2', { class: 'lobby-h' }, 'Top Sparks'),
       h('div', { class: 'spark-card' }, ...(r.top.length ? r.top.slice(0, 20).map((x, i) => h('div', { class: 'wallet-row' }, h('b', {}, '#' + (i + 1)), h('div', { class: 'mono' }, x.name), h('div', { class: 'mono' }, sparkNum(x.points)))) : [h('p', { class: 'hint' }, 'Nobody has Sparks yet. Be first.')])),
       h('p', { class: 'hint', style: 'margin-top:14px' }, SPARKS_NOTE));
