@@ -101,20 +101,21 @@ window.LocalBackend = (() => {
 
 
   // ---------- Sparks: loyalty points ----------
-  // Earned only by free actions (daily check-in, capped daily quests, inviting friends). They
-  // never depend on buying EMBER or on how much is bet or won, so they cannot be bought.
+// Earned by wagering (daily goals), a daily check-in and inviting friends. The wagering goals
+  // are capped per day at a level the free faucet covers in minutes, so buying EMBER gives no
+  // advantage: a free player can earn every Spark a paying player can.
   const QUESTS = {
-    rounds: { name: 'Play 20 rounds of anything', goal: 20, reward: 100 },
-    variety: { name: 'Play 3 different games', goal: 3, reward: 150 },
-    faucet: { name: 'Claim the free faucet', goal: 1, reward: 50 },
+    w1: { name: 'Wager 500 EMBER today', goal: 500, reward: 50 },
+    w2: { name: 'Wager 2,000 EMBER today', goal: 2000, reward: 150 },
+    w3: { name: 'Wager 5,000 EMBER today', goal: 5000, reward: 300 },
   };
   const CHECKIN_SPARKS = 50, REFERRER_SPARKS = 500, REFERRED_SPARKS = 200;
   const dayKey = (t = Date.now()) => new Date(t).toISOString().slice(0, 10);
   function daily(u) {
-    if (!u.daily || u.daily.day !== dayKey()) u.daily = { day: dayKey(), rounds: 0, games: {}, faucet: 0, claimed: {}, checkin: false };
+    if (!u.daily || u.daily.day !== dayKey()) u.daily = { day: dayKey(), wagered: 0, claimed: {}, checkin: false };
     return u.daily;
   }
-  const questProgress = (d, id) => (id === 'rounds' ? d.rounds : id === 'variety' ? Object.keys(d.games).length : d.faucet);
+  const questProgress = (d) => Math.floor(d.wagered || 0); // value wagered today, in EMBER (1 EMBER = 1 unit)
   function sparksView(u) {
     const d = daily(u), next = u.lastCheckin === dayKey(Date.now() - 864e5) ? (u.streak || 0) + 1 : 1;
     return {
@@ -153,7 +154,7 @@ window.LocalBackend = (() => {
   function recordBet(u, game, bet, cur, mult, nonce) {
     const payout = r8(bet * mult), rate = CURRENCIES[cur].rate;
     u.bal[cur] = r8(u.bal[cur] + payout);
-    u.stats.bets++; u.stats.wagered = r8(u.stats.wagered + bet * rate); u.stats.profit = r8(u.stats.profit + (payout - bet) * rate); const d = daily(u); d.rounds++; d.games[game] = 1;
+    u.stats.bets++; u.stats.wagered = r8(u.stats.wagered + bet * rate); u.stats.profit = r8(u.stats.profit + (payout - bet) * rate); const d = daily(u); d.wagered = (d.wagered || 0) + bet * rate;
     const rec = { id: ++db.betId, game, user: u.name, bet, cur, mult, payout, nonce, t: Date.now() };
     db.bets.push(rec);
     if (db.bets.length > 200) db.bets.splice(0, db.bets.length - 150);
@@ -207,7 +208,6 @@ window.LocalBackend = (() => {
       const wait = u.faucetAt + FAUCET_COOLDOWN - Date.now();
       if (wait > 0) bad(`Faucet available in ${Math.ceil(wait / 1000)}s`);
       u.faucetAt = Date.now();
-      daily(u).faucet = 1;
       u.bal[cur] = r8(u.bal[cur] + CURRENCIES[cur].start);
       save();
       return { bal: copy(u.bal) };

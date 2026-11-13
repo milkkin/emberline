@@ -33,6 +33,9 @@ async function call(method, payload) {
   await call('setChatMenuButton', { menu_button: { type: 'web_app', text: 'Play', web_app: { url: `${url}/` } } });
   console.log('Menu button "Play" now opens the game.');
   await call('setMyCommands', { commands: [{ command: 'start', description: 'Open Emberline' }, { command: 'paysupport', description: 'Help with a purchase' }] });
+  await call('setMyShortDescription', { short_description: 'Emberline: 10 original slots and 5 table games. Play credits only, no cash value, nothing to withdraw. 18+.' });
+  await call('setMyDescription', { description: 'Emberline is a casino-style game played with EMBER, a play currency.\n\n• 10 original slots with wild reels, tumbling wins and bonus buys\n• Dice, Limbo, Crash, Mines and Plinko\n• Every result can be checked in the Fairness panel\n• Earn Sparks by playing, checking in daily and inviting friends\n\nEMBER and Sparks have no cash value and can never be withdrawn, sold or exchanged. For entertainment only. 18+.' });
+  console.log('Bot description set.');
   const page = await fetch(`${url}/api/shop`).then((r) => r.json()).catch(() => null);
   console.log(page ? `Server reachable. Shop enabled: ${page.enabled}` : 'Warning: could not reach the server at PUBLIC_URL.');
   console.log(`Done. Open https://t.me/${me.username} and tap Play.`);
